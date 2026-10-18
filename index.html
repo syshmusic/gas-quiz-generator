@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAS 測驗題自動生成器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #e0f2fe; /* 改為淺藍色背景 (Tailwind sky-100) */
+        }
+        /* 隱藏預設捲軸，讓 auto-resize 更平滑 */
+        textarea {
+            overflow: hidden;
+            resize: none;
+        }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #10B981; /* Tailwind emerald-500 */
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 12px;
+            position: fixed;
+            z-index: 50;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s, visibility 0.3s, bottom 0.3s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased min-h-screen p-4 md:p-8">
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        <!-- 標題區塊 -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-indigo-600">📝 GAS 測驗題自動生成器</h1>
+                <p class="text-gray-500 mt-2 text-sm md:text-base">將純文字題目自動轉換為 Google Apps Script 程式碼，一鍵快速建立 Google 表單測驗。</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- 左側：輸入區 -->
+            <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col h-full">
+                <div class="flex justify-between items-end mb-4">
+                    <h2 class="text-xl font-bold text-gray-700 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                        貼上純文字測驗題目
+                    </h2>
+                    <button onclick="clearText()" class="text-sm text-gray-400 hover:text-red-500 transition-colors">清空內容</button>
+                </div>
+                
+                <textarea 
+                    id="inputText" 
+                    class="w-full bg-gray-50 border border-gray-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all flex-grow min-h-[300px]"
+                    placeholder="請在此貼上題目...&#10;&#10;【支援格式範例】&#10;1. 地形與氣候特徵：&#10;台灣的最高峰是？&#10;（A） 陽明山&#10;（B） 阿里山&#10;（C） 玉山&#10;（D） 雪山&#10;解答：C"
+                    oninput="autoResize(this)"
+                ></textarea>
+                
+                <button onclick="generateGAS()" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-md transition-transform transform hover:-translate-y-0.5 active:translate-y-0 flex justify-center items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    轉換為 GAS 程式碼
+                </button>
+            </div>
+
+            <!-- 右側：輸出區 -->
+            <div class="bg-gray-900 rounded-2xl p-6 shadow-sm flex flex-col h-full relative">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-100 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                        產生的 .gs 程式碼
+                    </h2>
+                    <button onclick="copyCode()" class="flex items-center bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 px-3 py-1.5 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                        複製程式碼
+                    </button>
+                </div>
+                
+                <div class="flex-grow relative border border-gray-700 rounded-xl overflow-hidden bg-[#1E1E1E]">
+                    <pre class="h-full w-full overflow-auto p-4 text-sm font-mono text-gray-300 leading-relaxed"><code id="outputCode">// 你的 GAS 程式碼將顯示在這裡...
+// 在左側輸入題目後，點擊「轉換為 GAS 程式碼」</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- 匯入提示流程 -->
+        <div class="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mt-6" id="instruction-section" style="display: none;">
+            <h3 class="text-lg font-bold text-indigo-700 mb-4 flex items-center">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                如何匯入 Google 表單？
+            </h3>
+            <ol class="list-decimal list-inside space-y-3 text-gray-700">
+                <li>打開您的 <a href="https://docs.google.com/forms/u/0/" target="_blank" class="text-blue-500 underline hover:text-blue-700">Google 表單</a>，並建立一個「空白表單」。</li>
+                <li>點擊右上角的 <strong>「更多選項 (三個點 ⋮)」</strong> ➜ 選擇 <strong>「指令碼編輯器」</strong>。</li>
+                <li>在開啟的 Apps Script 編輯器中，刪除原本的 <code>function myFunction() {...}</code>。</li>
+                <li>將剛才複製的 <strong>GAS 程式碼貼上</strong> 到編輯器中。</li>
+                <li>點擊上方的 <strong>「儲存專案 (💾)」</strong>，接著點擊 <strong>「執行 (▶)」</strong> 按鈕。</li>
+                <li><em>（首次執行時）</em>Google 會要求授權。點選「審查權限」➜ 選擇您的帳號 ➜ 點選「進階」➜ 點選「前往『未命名專案』(不安全)」➜ 點選「允許」。</li>
+                <li>回到您的 Google 表單頁面重新整理，考題就會自動建立完成！</li>
+            </ol>
+        </div>
+        
+        <!-- 頁尾 Credit -->
+        <footer class="text-center text-sm text-gray-400 mt-8 pb-4">
+            &copy; <a href="https://suno.com/@syshmusic" target="_blank" rel="noopener noreferrer" class="text-indigo-500 hover:text-indigo-600 hover:underline transition-colors font-medium">syshmusic</a> | Hung-Chi Yin 尹鴻綺
+        </footer>
+    </div>
+
+    <!-- 自訂訊息框 (取代 alert) -->
+    <div id="toastMessage" class="toast">
+        ✅ 程式碼已成功複製到剪貼簿！
+    </div>
+
+    <script>
+        // 自動擴展輸入框的高度
+        function autoResize(textarea) {
+            textarea.style.height = 'auto'; 
+            textarea.style.height = (textarea.scrollHeight) + 'px';
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tx = document.getElementById('inputText');
+            if (tx.value) { autoResize(tx); }
+        });
+
+        function clearText() {
+            const tx = document.getElementById('inputText');
+            tx.value = '';
+            tx.style.height = '300px'; 
+            document.getElementById('outputCode').textContent = '// 你的 GAS 程式碼將顯示在這裡...\n// 在左側輸入題目後，點擊「轉換為 GAS 程式碼」';
+            document.getElementById('instruction-section').style.display = 'none';
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toastMessage');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+
+        function copyCode() {
+            const codeText = document.getElementById('outputCode').textContent;
+            if (codeText.includes('// 你的 GAS 程式碼將顯示在這裡')) {
+                showToast('❌ 請先產生程式碼！');
+                return;
+            }
+
+            let textArea = document.createElement("textarea");
+            textArea.value = codeText;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            
+            textArea.focus();
+            textArea.select();
+            
+            try {
+                document.execCommand('copy');
+                showToast('✅ 程式碼已成功複製到剪貼簿！');
+            } catch (err) {
+                showToast('❌ 複製失敗，請手動全選複製。');
+            } finally {
+                textArea.remove();
+            }
+        }
+
+        // 核心解析邏輯
+        function parseQuizData(rawText) {
+            const lines = rawText.split('\n').map(l => l.trim()).filter(l => l !== '');
+            const qStartRegex = /^[\*\#\s]*(?:Q|q)?\d+[\.、\)]/;
+
+            // 1. 智慧辨識並萃取簡潔的表單標題
+            let preamble = [];
+            while (lines.length > 0 && !qStartRegex.test(lines[0]) && !/^[\(（]?[A-D][)）\.、]/.test(lines[0])) {
+                preamble.push(lines.shift());
+            }
+            
+            let formTitle = "";
+            let rawTitle = "";
+            if (preamble.length > 0) {
+                rawTitle = preamble.join(" ").replace(/[*#_]/g, '').trim();
+                
+                // 移除 AI 常用的開場白
+                rawTitle = rawTitle.replace(/^(?:根據|嗨|您好|這|以下|為您).*?(?:設計|提供|測驗|選擇題|練習題).*?[：:]\s*/i, '');
+                rawTitle = rawTitle.replace(/^(?:這是一份|關於|有關)/i, '');
+                
+                // 如果文字中有書名號或引號，直接萃取
+                const bookMatch = rawTitle.match(/《(.*?)》/);
+                const quoteMatch = rawTitle.match(/「(.*?)」/);
+                const angleMatch = rawTitle.match(/〈(.*?)〉/);
+                
+                if (bookMatch) {
+                    formTitle = `《${bookMatch[1]}》`;
+                } else if (quoteMatch) {
+                    formTitle = `「${quoteMatch[1]}」`;
+                } else if (angleMatch) {
+                    formTitle = `〈${angleMatch[1]}〉`;
+                } else if (rawTitle.length > 0 && rawTitle.length <= 20) {
+                    formTitle = rawTitle; // 夠短就直接當標題
+                }
+            }
+
+            const questions = [];
+            let currentQ = null;
+
+            // 判斷答案的正則表達式 (支援 "解答:C", "答案：(B)", "**正確答案：(B)**" 等，且支援全半形)
+            const ansRegex = /(?:解答|答案|正確答案|Ans(?:wer)?)\s*[:：]?\s*[\(（\*\s]*([A-D])[\)）\*\s]*/i;
+            
+            // 判斷選項開頭：支援 "A.", "A)", "(A)", "（A）" 等全半形混用
+            const optStartRegex = /^[\(（]?([A-D])[)）\.、]\s*(.+)/;
+            
+            // 嘗試解析選項 (處理在同一行的選項：A. xx B. xx 或 (A) xx (B) xx，支援全半形)
+            const inlineOptRegex = /([\(（]?([A-D])[)）\.、].+?)(?=[\(（]?[A-D][)）\.、]|$)/g;
+
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i];
+
+                // 1. 檢查是否為獨立的解答行
+                const ansMatch = line.match(ansRegex);
+                if (ansMatch && !line.match(optStartRegex)) { // 避免選項裡面剛好有解答字眼
+                    if (currentQ) currentQ.ansLetter = ansMatch[1].toUpperCase();
+                    continue;
+                }
+
+                // 2. 檢查是否是選項都在同一行
+                if (/[\(（]?[A-D][)）\.、].+[\(（]?[B-D][)）\.、]/.test(line)) {
+                    let matches = [...line.matchAll(inlineOptRegex)];
+                    if (matches.length > 1) { // 確保真的有多個選項
+                        matches.forEach(m => {
+                            let optText = m[1].replace(/^[\(（]?([A-D])[)）\.、]\s*/, '').trim();
+                            // 判斷是否有星號標記解答 (單一星號，排除 markdown **)
+                            if ((optText.startsWith('*') && !optText.startsWith('**')) || (optText.endsWith('*') && !optText.endsWith('**'))) {
+                                if (currentQ) currentQ.ansIndex = currentQ.options.length;
+                                optText = optText.replace(/^\*|\*$/g, '').trim();
+                            }
+                            if (currentQ) currentQ.options.push(optText);
+                        });
+                        continue;
+                    }
+                }
+
+                // 3. 檢查是否為單一選項行
+                let cleanLine = line;
+                let hasStarStart = false;
+                
+                if (cleanLine.startsWith('**')) { cleanLine = cleanLine.replace(/^\*\*/, '').trim(); }
+                if (cleanLine.startsWith('*') && !cleanLine.startsWith('**')) {
+                    hasStarStart = true;
+                    cleanLine = cleanLine.substring(1).trim();
+                }
+
+                const optMatch = cleanLine.match(optStartRegex);
+                if (optMatch) {
+                    let optText = optMatch[2].trim(); 
+                    if (hasStarStart || (optText.endsWith('*') && !optText.endsWith('**')) || (optText.startsWith('*') && !optText.startsWith('**'))) {
+                        if (currentQ) currentQ.ansIndex = currentQ.options.length;
+                        optText = optText.replace(/^\*|\*$/g, '').trim(); 
+                    }
+                    if (currentQ) currentQ.options.push(optText);
+                    continue;
+                }
+
+                // 4. 若不是選項也不是解答行，判斷為題目行（或題目的接續）
+                let isNewQuestion = false;
+                if (qStartRegex.test(line)) { isNewQuestion = true; }
+
+                if (isNewQuestion || !currentQ || (currentQ.options.length > 0 && (currentQ.ansLetter || currentQ.ansIndex !== -1))) {
+                    currentQ = {
+                        q: line.replace(/^[\*\#\s]*(?:Q|q)?\d+[\.、\)]\s*/, ''), 
+                        options: [],
+                        ansLetter: null,
+                        ansIndex: -1
+                    };
+                    questions.push(currentQ);
+                } else {
+                    if (currentQ.options.length === 0) {
+                        currentQ.q += '\n' + line;
+                    }
+                }
+            }
+
+            const letterToIndex = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+            const finalQuizData = [];
+            let extractedTopic = ""; // 用來儲存從題目萃取出的「大方向」
+
+            // 輔助函式：清除 Markdown 符號
+            function cleanMarkdown(str) {
+                if (!str) return "";
+                return str.replace(/(\*\*|\*|__|_|###|##|#)/g, '').trim();
+            }
+
+            // 輔助函式：清除題目標籤 (例如 "音樂氛圍與樂器運用：")
+            function cleanQuestion(str) {
+                let text = cleanMarkdown(str);
+                // 抓取題目標籤作為大方向 (例如 "音樂氛圍與樂器運用：")
+                const topicMatch = text.match(/^([^：:\n]{2,15})[：:]\s*/);
+                if (topicMatch && !extractedTopic) {
+                    extractedTopic = topicMatch[1].trim(); // 儲存第一個抓到的標籤
+                }
+                // 拔除開頭是 2~20 個字元加上冒號的情境 (無論是否換行)
+                text = text.replace(/^[^：:\n]{2,20}[：:]\s*/, '');
+                return text.trim();
+            }
+
+            questions.forEach(q => {
+                if (q.options.length === 0) return; 
+
+                let finalAnsIndex = 0;
+                if (q.ansIndex !== -1) {
+                    finalAnsIndex = q.ansIndex;
+                } else if (q.ansLetter && letterToIndex[q.ansLetter] !== undefined) {
+                    finalAnsIndex = letterToIndex[q.ansLetter];
+                }
+
+                finalQuizData.push({
+                    q: cleanQuestion(q.q), // 這裡清除題目分類標籤與 Markdown，並萃取主題
+                    o: q.options.map(opt => cleanMarkdown(opt)), // 選項只清 Markdown
+                    a: finalAnsIndex
+                });
+            });
+
+            // 最終決定表單標題：若沒有書名號，就用萃取出的「大方向」命名
+            if (!formTitle || formTitle.trim() === "" || formTitle.length > 20) {
+                if (extractedTopic) {
+                    formTitle = extractedTopic;
+                } else if (rawTitle.trim().length > 0) {
+                    formTitle = rawTitle.substring(0, 15);
+                } else {
+                    formTitle = "自動生成的測驗表單";
+                }
+            }
+            
+            // 最後防線：確保標題絕對有值
+            if (!formTitle || formTitle.trim() === "") {
+                formTitle = "自動生成的測驗表單";
+            }
+
+            return {
+                title: formTitle,
+                questions: finalQuizData
+            };
+        }
+
+        // 產生 GAS 程式碼
+        function generateGAS() {
+            const rawText = document.getElementById('inputText').value;
+            if (!rawText.trim()) {
+                showToast('⚠️ 請先輸入測驗題目！');
+                return;
+            }
+
+            const parsedData = parseQuizData(rawText);
+            const formTitle = parsedData.title;
+            const quizData = parsedData.questions;
+            
+            if (quizData.length === 0) {
+                showToast('❌ 無法解析出有效題目，請確認格式。');
+                return;
+            }
+
+            const jsonString = JSON.stringify(quizData, null, 4);
+            const safeTitle = JSON.stringify(formTitle); 
+
+            // 在 GAS 中加入自動計算配分的邏輯
+            const gasCode = `// --- 程式碼架構開始 ---
+function createAutoQuiz() {
+  const form = FormApp.getActiveForm();
+  
+  // === 表單基本與進階設定 ===
+  form.setIsQuiz(true); // 強制開啟測驗模式
+  form.setTitle(${safeTitle}); // 自動設定乾淨的表單標題
+  form.setCollectEmail(true); // 收集電子郵件地址
+  form.setLimitOneResponsePerUser(true); // 僅限回覆 1 次 (會自動要求登入)
+  form.setAllowResponseEdits(false); // 不允許提交後編輯回覆
+  // =========================
+  
+  // 清空現有題目，避免重複執行產生混亂
+  const items = form.getItems();
+  for (var i = items.length - 1; i >= 0; i--) {
+    form.deleteItem(items[i]);
+  }
+
+  // --- 建立學生基本資料題 (預設不計分) ---
+  var classNumItem = form.addTextItem();
+  classNumItem.setTitle('你的班級座號？（請連續填寫數字，例如：50612）');
+  classNumItem.setRequired(true);
+
+  var nameItem = form.addTextItem();
+  nameItem.setTitle('你的姓名？');
+  nameItem.setRequired(true);
+  // ------------------------------------
+
+  // 測驗題庫資料庫
+  const quizData = ${jsonString};
+
+  // 自動偵測題數，配分加總為 100 分
+  const totalQuestions = quizData.length;
+  let baseScore = Math.ceil(100 / totalQuestions);
+  let firstScore = 100 - (baseScore * (totalQuestions - 1));
+
+  // 防呆：若題數過多導致第一題分數小於等於 0，則改為第一題分數較多
+  if (firstScore <= 0 && totalQuestions > 0) {
+    baseScore = Math.floor(100 / totalQuestions);
+    firstScore = 100 - (baseScore * (totalQuestions - 1));
+  }
+
+  // 迴圈生成題目
+  let successCount = 0;
+  quizData.forEach(function(data, index) {
+    if (data.q && data.o && data.o.length > 0) {
+      try {
+        var item = form.addMultipleChoiceItem();
+        var currentPoints = (index === 0) ? firstScore : baseScore;
+        
+        // 【核心修正】Google Apps Script 的 .setPoints(0) 會觸發 Bug，
+        // 必須確保 currentPoints 是有效的正整數，最低為 1
+        if (typeof currentPoints !== 'number' || isNaN(currentPoints) || currentPoints <= 0) {
+          currentPoints = 1;
+        }
+        
+        item.setTitle(data.q)
+            .setChoices(data.o.map(function(choice, idx) {
+              return item.createChoice(choice, idx === data.a);
+            }))
+            .setPoints(currentPoints) 
+            .setRequired(true);
+            
+        successCount++;
+      } catch (e) {
+        Logger.log("建立題目時發生錯誤：" + e.message + "，題目內容：" + data.q);
+      }
+    }
+  });
+  
+  Logger.log('✅ 考題生成完成！成功建立 ' + successCount + ' 題。第一題 ' + firstScore + ' 分，其餘每題 ' + baseScore + ' 分。');
+}
+// --- 程式碼架構結束 ---`;
+
+            document.getElementById('outputCode').textContent = gasCode;
+            document.getElementById('instruction-section').style.display = 'block'; 
+            
+            showToast('✅ 轉換成功！請複製程式碼。');
+            setTimeout(() => {
+                document.getElementById('instruction-section').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }, 300);
+        }
+    </script>
+</body>
+</html>
